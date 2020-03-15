@@ -26,7 +26,7 @@ class BlockchainNode():
     self._public_key = self._crypto.generate_public_key(self._private_key)
     self._address = self._crypto.generate_address(self._public_key)
 
-  @property
+  @propertyli
   def blockchain(self):
     return self._blockchain.export_chain()
 
@@ -124,29 +124,70 @@ class BlockchainNode():
       nonce += 1
     return nonce
 
+  @property
+  def last_block():
+    return self._blockchain.last_block
+
+  @property
+  def nodes():
+    return self._nodes
+
 
 app = flask.Flask(__name__)
 node = BlockchainNode()
 
 @app.route('/mine', methods=['GET'])
 def mine():
-  pass
+  node.mine_block()
+  response = {
+    'block' : node.last_block
+  }
+  return flask.jsonify(response), 200
 
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
-  pass
+  values = request.get_json()
+  if node.new_transaction(values['transaction']) == True:
+    return 201
+  else:
+    return "Wrong transaction", 400
 
 @app.route('/chain', methods=['GET'])
 def full_chain():
-  pass
+  response = {
+    'chain' : node.blockchain, 200
+  }
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
-  pass
+  values = request.get_json()
+
+  nodes = values.get('nodes')
+  if nodes is None:
+    return "Error: Please supply a valid list of nodes", 400
+
+  for other_node in nodes:
+    node.register_node(other_node)
+
+  response = {
+    'message': 'New nodes have been added'
+  }
+  return jsonify(response), 201
 
 @app.route('/nodes/resolve', methods=['GET'])
 def consensus():
-  pass
+  replaced = node.resolve_conflicts()
+
+  if replaced:
+    response = {
+      'message': 'Our chain was replaced'
+    }
+  else:
+    response = {
+      'message': 'Our chain is authoritative'
+    }
+
+  return jsonify(response), 200
 
 if __name__ == '__main__':
   from argparse import ArgumentParser
