@@ -8,6 +8,7 @@ from uuid import uuid4
 from blockchain import Blockchain
 from bccrypto import BlockchainCrypto
 from bcvalidator import BlockchainValidator
+from bcfile import BlockchainFile
 
 class BlockchainClient():
   def __init__(self):
@@ -15,6 +16,9 @@ class BlockchainClient():
     self._nodes = set()
     self._crypto = BlockchainCrypto()
     self._validator = BlockchainValidator()
+    self._bcfile = BlockchainFile()
+    self._filename_chain = "client_blockchain.bin"
+    self._filename_privk = "client_private_key.bin"
     self._private_key = str()
     self._public_key = str()
     self._address = str()
@@ -22,6 +26,41 @@ class BlockchainClient():
     self._availible_transactions = dict()
     self._auth_ready = False
     self._bc_ready = False
+
+  def save(self):
+    if not self._blockchain or not self._auth_ready:
+      return False
+
+    self._bcfile.filename = self._filename_chain
+    if self._bcfile.save(self._blockchain.export_chain()) == False:
+      self._bcfile.filename = ""
+      return False
+    self._bcfile.filename = self._filename_privk
+    if self._bcfile.save(self._private_key) == False:
+      self._bcfile.filename = ""
+      return False
+    self._bcfile.filename = ""
+    return True
+
+  def load(self):
+    self._bcfile.filename = self._filename_privk
+    temp_privk = self._bcfile.load()
+
+    self._bcfile.filename = self._filename_chain
+    temp_chain = self._bcfile.load()
+
+    self._bcfile.filename = ""
+
+    if temp_privk == None or temp_chain == None:
+      return False
+
+    if self.load_auth(temp_privk) == False:
+      return False
+
+    if self._blockchain.import_chain(temp_chain) == False:
+      return False
+    
+    return True
     
   def register_node(self, address):
     parsed_url = urlparse(address)
@@ -162,41 +201,53 @@ class BlockchainClient():
 app = flask.Flask(__name__)
 client = BlockchainClient()
 
+@app.route('/data/save', methods=['POST'])
+def save_data():
+  if client.save() == False:
+    return "Error", 400
+  return "Data saved", 200
+
+@app.route('/data/load', methods=['POST'])
+def load_data():
+  if client.load() == False:
+    return "Error", 400
+  return "Data loaded", 200
+
+@app.route('/auth/generate', methods=['POST'])
+def gen_auth():
+  client.generate_auth()
+  return "Auth generated", 200
+
+@app.route('/auth/load', methods=['POST'])
+def load_auth():
+  values = flask.request.get_json()
+  if values is None:
+    return "Error", 400
+
+  if values['private_key'] is None:
+    return "Error", 400
+
+  if client.load_auth(values['private_key']) == False:
+    return "Error", 400
+
+  return "Auth loaded", 200
+
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
   values = flask.request.get_json()
   if values is None:
-    return 400
+    return "Error", 400
 
   if values['amount'] is None or values['recipient'] is None:
-    return 400
+    return "Error", 400
 
   amount = values['amount']
   recipient = values['recipient']
 
   if client.make_transaction(recipient, amount) is False:
-    return 400
+    return "Error", 400
 
   return 201
-
-@app.route('/auth/generate', methods=['POST'])
-def init_client():
-  client.generate_auth()
-  return "Auth generated", 200
-
-@app.route('/auth/load', methods=['POST'])
-def init_client():
-  values = flask.request.get_json()
-  if values is None:
-    return 400
-
-  if values['private_key'] is None:
-    return 400
-
-  if client.load_auth(values['private_key']) == False:
-    return 400
-
-  return "Auth loaded", 200
 
 # @app.route('/chain', methods=['GET'])
 # def full_chain():

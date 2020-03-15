@@ -2,13 +2,14 @@ import json
 import flask
 import time
 import requests
-import pickle
+import re
 from urllib.parse import urlparse 
 from uuid import uuid4
 
 from blockchain import Blockchain
 from bccrypto import BlockchainCrypto
 from bcvalidator import BlockchainValidator
+from bcfile import BlockchainFile
 
 class BlockchainNode():
   def __init__(self):
@@ -17,12 +18,49 @@ class BlockchainNode():
     self._blockchain = Blockchain()
     self._validator = BlockchainValidator()
     self._crypto = BlockchainCrypto()
-    # self._identifier = str(uuid4()).replace('-', '')
+    self._bcfile = BlockchainFile()
+    self._filename_chain = "node_blockchain.bin"
+    self._filename_privk = "node_private_key.bin"
     self._private_key = str()
     self._public_key = str()
     self._address = str()
     self._auth_ready = False
     self._bc_ready = False
+
+  def save(self):
+    if not self._blockchain or not self._auth_ready:
+      return False
+
+    self._bcfile.filename = self._filename_chain
+    if self._bcfile.save(self._blockchain.export_chain()) == False:
+      self._bcfile.filename = ""
+      return False
+    self._bcfile.filename = self._filename_privk
+    if self._bcfile.save(self._private_key) == False:
+      self._bcfile.filename = ""
+      return False
+    self._bcfile.filename = ""
+    return True
+
+  def load(self):
+    self._bcfile.filename = self._filename_privk
+    temp_privk = self._bcfile.load()
+
+    self._bcfile.filename = self._filename_chain
+    temp_chain = self._bcfile.load()
+
+    self._bcfile.filename = ""
+
+    if temp_privk == None or temp_chain == None:
+      return False
+
+    if self.load_auth(temp_privk) == False:
+      return False
+
+    if self._blockchain.import_chain(temp_chain) == False:
+      return False
+    
+    return True
 
   def generate_auth(self):
     self._private_key = self._crypto.generate_private_key()
@@ -163,26 +201,38 @@ class BlockchainNode():
 app = flask.Flask(__name__)
 node = BlockchainNode()
 
+@app.route('/data/save', methods=['POST'])
+def save_data():
+  if node.save() == False:
+    return "Error", 400
+  return "Data saved", 200
+
+@app.route('/data/load', methods=['POST'])
+def load_data():
+  if node.load() == False:
+    return "Error", 400
+  return "Data loaded", 200
+
 @app.route('/auth/generate', methods=['POST'])
-def init_client():
+def gen_auth():
   node.generate_auth()
   return "Auth generated", 200
 
 @app.route('/auth/load', methods=['POST'])
-def init_client():
+def load_auth():
   values = flask.request.get_json()
   if values is None:
-    return 400
+    return "Error", 400
 
   if values['private_key'] is None:
-    return 400
+    return "Error", 400
 
   if node.load_auth(values['private_key']) == False:
-    return 400
+    return "Error", 400
 
   return "Auth loaded", 200
 
-@app.route('/mine', methods=['GET'])
+@app.route('/mine', methods=['POST'])
 def mine():
   block = node.mine_block()
   if block is None:
@@ -197,7 +247,7 @@ def mine():
 def new_transaction():
   values = flask.request.get_json()
   if values is None:
-    return 400
+    return "Error", 400
 
   if values['transaction'] is None:
     return False
@@ -206,7 +256,7 @@ def new_transaction():
   transaction = json.loads(tx_json)
 
   if node.new_transaction(transaction) == True:
-    return 201
+    return "Success", 201
   else:
     return "Wrong transaction", 400
 
@@ -236,7 +286,7 @@ def register_nodes():
   }
   return flask.jsonify(response), 201
 
-@app.route('/nodes/resolve', methods=['GET'])
+@app.route('/nodes/resolve', methods=['POST'])
 def consensus():
   replaced = node.resolve_conflicts()
 
