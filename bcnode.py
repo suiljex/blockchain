@@ -243,7 +243,7 @@ def mine():
   }
   return flask.jsonify(response), 200
 
-@app.route('/transactions/new', methods=['POST'])
+@app.route('/transaction/new', methods=['POST'])
 def new_transaction():
   values = flask.request.get_json()
   if values is None:
@@ -255,10 +255,11 @@ def new_transaction():
   tx_json = values['transaction']
   transaction = json.loads(tx_json)
 
-  if node.new_transaction(transaction) == True:
-    return "Success", 201
-  else:
+  if node.new_transaction(transaction) == None:
     return "Wrong transaction", 400
+  else:
+    return "Success", 201
+    
 
 @app.route('/chain', methods=['GET'])
 def full_chain():

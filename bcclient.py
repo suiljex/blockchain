@@ -124,7 +124,7 @@ class BlockchainClient():
 
     for block in self._blockchain.export_chain():
       for tx in block['data']['transactions']:
-        if tx['header']['sender'] == self._address:
+        if tx['header']['sender'] == self._address and tx['header']['type'] == 2:
           for tx_output in tx['data']['outputs']:
             self._balance -= tx_output['amount']
           for tx_input in tx['data']['inputs']:
@@ -153,7 +153,7 @@ class BlockchainClient():
       for tx_output in self._availible_transactions[tx_id]['data']['outputs']:
         if tx_output['recipient'] == self._address:
           tx_balance += tx_output['amount']
-      tx_inputs.append({'tx_id', tx_id})
+      tx_inputs.append({'tx_id' : tx_id})
       if tx_balance >= amount:
         break
 
@@ -175,7 +175,7 @@ class BlockchainClient():
     signature = self._crypto.sign(tx_data_hash, self._private_key)
 
     tx_header = {
-      'type' : 1,
+      'type' : 2,
       'sender' : self._address,
       'public_key' : self._public_key,
       'signature' : signature
@@ -188,7 +188,7 @@ class BlockchainClient():
 
     for node in self._nodes:
       try:
-        response = requests.post(f'http://{node}/transactions/new', json={"transaction" : json.dumps(transaction)})
+        response = requests.post(f'http://{node}/transaction/new', json={"transaction" : json.dumps(transaction)})
       except requests.ConnectionError:
         break
 
@@ -247,7 +247,7 @@ def new_transaction():
   if client.make_transaction(recipient, amount) is False:
     return "Error", 400
 
-  return 201
+  return "Success", 201
 
 # @app.route('/chain', methods=['GET'])
 # def full_chain():
@@ -283,7 +283,7 @@ def register_nodes():
   }
   return flask.jsonify(response), 201
 
-@app.route('/nodes/resolve', methods=['GET'])
+@app.route('/nodes/resolve', methods=['POST'])
 def consensus():
   replaced = client.resolve_conflicts()
 

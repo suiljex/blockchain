@@ -44,7 +44,7 @@ class BlockchainValidator():
     if self._valid_chain(chain, service_data) == False:
       return False
     
-    return self._valid_transaction(transaction, service_data) == False
+    return self._valid_transaction(transaction, service_data)
     
   def _valid_chain(self, chain, service_data):
     if len(chain) <= 1:
@@ -124,14 +124,16 @@ class BlockchainValidator():
 
     elif transaction['header']['type'] == 2:
       for input_tx in transaction['data']['inputs']:
+        #Проверка на то, что входные транзакции действительно были отправлены, совершающему транзакцию
         for tx_out in service_data['txs_list'][input_tx['tx_id']]['data']['outputs']:
-          if tx_out['recipient'] == input_tx['recipient']:
+          if tx_out['recipient'] == transaction['header']['sender']:
             inputs_sum += tx_out['amount']
 
-        full_tx = f"{input_tx['tx_id']}:{input_tx['recipient']}"
+        #Проверка на то, что транзакции уже не использованы
+        full_tx = f"{input_tx['tx_id']}:{transaction['header']['sender']}"
         if full_tx in service_data['used_transactions']:
           return False
-        service_data['used_transactions'].append(full_tx)
+        service_data['used_transactions'].add(full_tx)
 
       for output_tx in transaction['data']['outputs']:
         if output_tx['amount'] < 0:
