@@ -81,6 +81,24 @@ class BlockchainValidator():
     return True
 
   def _valid_transaction(self, transaction, service_data):
+    if type(transaction) != type(dict()):
+      return False
+    if transaction.keys().sort() != ['header', 'data'].sort():
+      return False
+    if transaction['header'].keys().sort() != ['type', 'sender', 'public_key', 'signature'].sort():
+      return False
+    if transaction['header']['type'] == 2 and transaction['data'].keys().sort() != ['inputs', 'outputs'].sort():
+      return False
+    if transaction['header']['type'] == 1 and transaction['data'].keys().sort() != ['outputs'].sort():
+      return False
+    for tx_output in transaction['data']['outputs']:
+      if tx_output.keys().sort() != ['reciever', 'amount'].sort():
+        return False
+    if transaction['header']['type'] == 2:
+      for tx_input in transaction['data']['outputs']:
+        if tx_input.keys().sort() != ['tx_id'].sort():
+          return False
+        
     inputs_sum = 0
     outputs_sum = 0
 
