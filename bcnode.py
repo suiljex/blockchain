@@ -2,6 +2,7 @@ import json
 import flask
 import time
 import requests
+import pickle
 from urllib.parse import urlparse 
 from uuid import uuid4
 
@@ -20,13 +21,16 @@ class BlockchainNode():
     self._private_key = str()
     self._public_key = str()
     self._address = str()
+    self._auth_ready = False
+    self._bc_ready = False
 
   def generate_auth(self):
     self._private_key = self._crypto.generate_private_key()
     self._public_key = self._crypto.generate_public_key(self._private_key)
     self._address = self._crypto.generate_address(self._public_key)
+    self._auth_ready = True
 
-  @propertyli
+  @property
   def blockchain(self):
     return self._blockchain.export_chain()
 
@@ -62,15 +66,19 @@ class BlockchainNode():
 
     return False
 
-
-  # def new_transaction(self, sender, public_key, signature, inputs, outputs):
   def new_transaction(self, transaction):
+    if not self._blockchain or not self._auth_ready:
+      return None
+
     if self._validator.valid_transaction(transaction, self._blockchain) == True:
       self._pending_transactions.append(transaction)
       return transaction
     return None
 
   def mine_block(self):
+    if not self._blockchain or not self._auth_ready:
+      return None
+
     tx_data = {
       'outputs' : [
         {
@@ -155,8 +163,9 @@ def new_transaction():
 @app.route('/chain', methods=['GET'])
 def full_chain():
   response = {
-    'chain' : node.blockchain, 200
+    'chain' : node.blockchain
   }
+  return flask.jsonify(response), 200
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
