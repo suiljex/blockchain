@@ -93,7 +93,7 @@ class BlockchainClient():
     if not self._blockchain or not self._auth_ready:
       return False
 
-    if self._balance < amount:
+    if self._balance < amount or amount <= 0:
       return False
 
     tx_balance = 0
@@ -137,9 +137,15 @@ class BlockchainClient():
     }
 
     for node in self._nodes:
-      response = requests.post(f'http://{node}/transactions/new')
+      try:
+        response = requests.post(f'http://{node}/transactions/new', json={"transaction" : json.dumps(transaction)})
+      except requests.ConnectionError:
+        break
 
-    return True
+      if response.status_code == 201:
+        return True
+
+    return False
 
 
 app = flask.Flask(__name__)
@@ -147,11 +153,18 @@ client = BlockchainClient()
 
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
-  values = request.get_json()
-  # if node.new_transaction(values['transaction']) == True:
-  #   return 201
-  # else:
-  #   return "Wrong transaction", 400
+  values = flask.request.get_json()
+  if values is None:
+    return 400
+
+  if values['amount'] is None or values['recipient'] is None:
+    return 400
+
+  amount = values['amount']
+  recipient = values['recipient']
+
+  if client.make_transaction(recipient, amount) is False:
+    return 400
 
   return 201
 

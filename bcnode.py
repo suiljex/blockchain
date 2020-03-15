@@ -73,7 +73,7 @@ class BlockchainNode():
     if not self._blockchain or not self._auth_ready:
       return None
 
-    if self._validator.valid_transaction(transaction, self._blockchain) == True:
+    if self._validator.valid_transaction(transaction, self._blockchain.export_chain()) == True:
       self._pending_transactions.append(transaction)
       return transaction
     return None
@@ -170,8 +170,17 @@ def mine():
 
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
-  values = request.get_json()
-  if node.new_transaction(values['transaction']) == True:
+  values = flask.request.get_json()
+  if values is None:
+    return 400
+
+  if values['transaction'] is None:
+    return False
+
+  tx_json = values['transaction']
+  transaction = json.loads(tx_json)
+
+  if node.new_transaction(transaction) == True:
     return 201
   else:
     return "Wrong transaction", 400
