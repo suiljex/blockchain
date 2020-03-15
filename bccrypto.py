@@ -9,8 +9,8 @@ class BlockchainCrypto():
   def valid_proof(last_hash, nonce, difficulty):
     guess = f'{last_hash}{nonce}'.encode()
     guess_hash = hashlib.sha256(guess).hexdigest()
-    guess_hash_binary = str(bin(int(guess_hash, base=16)))[2:]
-    return guess_hash_binary[0:difficulty] == "0" * difficulty
+    guess_hash_int = int(guess_hash, base=16)
+    return guess_hash_int < pow(2,256 - difficulty)
 
   @staticmethod
   def hash(block):
@@ -61,7 +61,7 @@ class BlockchainCrypto():
 
   @staticmethod
   def calculate_difficulty(hight):
-    return 0
+    return hight
 
   @staticmethod
   def calculate_reward(difficulty):

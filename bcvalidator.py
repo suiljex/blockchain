@@ -48,8 +48,10 @@ class BlockchainValidator():
     
   def _valid_chain(self, chain, service_data):
     if len(chain) <= 1:
+      service_data['hight'] = len(chain)
       return True
 
+    service_data['hight'] = 1
     service_data['previous_block'] = chain[0]
     for block in chain[1:]:
       if self._valid_block(block, service_data) == False:
