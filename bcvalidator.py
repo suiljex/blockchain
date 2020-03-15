@@ -1,4 +1,5 @@
 import json
+import re
 from bccrypto import BlockchainCrypto
 
 class BlockchainValidator():
@@ -43,7 +44,7 @@ class BlockchainValidator():
     if self._valid_chain(chain, service_data) == False:
       return False
     
-    return self._valid_transaction(chain, service_data) == False
+    return self._valid_transaction(transaction, service_data) == False
     
   def _valid_chain(self, chain, service_data):
     if len(chain) <= 1:
@@ -114,6 +115,8 @@ class BlockchainValidator():
       for output_tx in transaction['data']['outputs']:
         if output_tx['amount'] < 0:
           return False
+        if self._valid_address(output_tx['recipient']) is False:
+          return False
         outputs_sum += output_tx['amount']
 
       if outputs_sum != self._crypto.calculate_reward(service_data['difficulty']):
@@ -133,11 +136,18 @@ class BlockchainValidator():
       for output_tx in transaction['data']['outputs']:
         if output_tx['amount'] < 0:
           return False
+        if self._valid_address(output_tx['recipient']) is False:
+          return False
         outputs_sum += output_tx['amount']
 
       if inputs_sum != outputs_sum:
         return False
     return True
+
+  def _valid_address(self, address):
+    regex = re.compile('[a-f0-9]{64}')
+    match = regex.match(address)
+    return bool(match)
 
 if __name__ == '__main__':
   print("This module is a dependecy")
