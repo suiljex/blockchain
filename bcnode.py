@@ -162,6 +162,8 @@ class BlockchainNode():
       'transactions' : [tx_reward] + self._pending_transactions
     }
 
+    self._pending_transactions = list()
+
     block_header = {
       'version' : 1,
       'timestamp' : time.time(),

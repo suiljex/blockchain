@@ -143,6 +143,8 @@ class BlockchainClient():
     if not self._blockchain or not self._auth_ready:
       return False
 
+    self.calculate_balance()
+
     if self._balance < amount or amount <= 0:
       return False
 
