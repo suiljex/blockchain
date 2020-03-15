@@ -50,7 +50,10 @@ class BlockchainNode():
     max_length = len(self._blockchain.export_chain())
 
     for node in neighbours:
-      response = requests.get(f'http://{node}/chain')
+      try:
+        response = requests.get(f'http://{node}/chain')
+      except requests.ConnectionError:
+        break
 
       if response.status_code == 200:
         length = response.json()['length']
@@ -79,11 +82,14 @@ class BlockchainNode():
     if not self._blockchain or not self._auth_ready:
       return None
 
+    temp_difficulty = self._crypto.calculate_difficulty(len(self._blockchain.export_chain()))
+    temp_amount = self._crypto.calculate_reward(temp_difficulty)
+
     tx_data = {
       'outputs' : [
         {
           'recipient' : self._address,
-          'amount' : 0 # TODO difficulty
+          'amount' : temp_amount
         }
       ]
     }
@@ -99,8 +105,8 @@ class BlockchainNode():
     }
 
     tx_reward = {
-      tx_header,
-      tx_data
+      'header' : tx_header,
+      'data' : tx_data
     }
 
     block_data = {
@@ -112,23 +118,25 @@ class BlockchainNode():
       'timestamp' : time.time(),
       'previous_block' : self._crypto.hash(self._blockchain.last_block['header']),
       'nonce' : 0,
-      'difficulty' : 0, # TODO difficulty
+      'difficulty' : temp_difficulty,
       'data_hash' : self._crypto.hash(block_data)
     }
 
-    block_header['nonce'] = self._proof_of_work(block_header['data_hash'])
+    block_header['nonce'] = self._proof_of_work(block_header['data_hash'], temp_difficulty)
 
     block = {
       'header' : block_header,
       'data' : block_data
     }
 
-    return self._blockchain.new_block(block)
+    if self._blockchain.new_block(block) is False:
+      return None
+    return block
 
-  def _proof_of_work(self, data):
+  def _proof_of_work(self, data, difficulty):
     # last_block_hash = hash(self._blockchain.last_block['header'])
     nonce = 0
-    while self._crypto.valid_proof(data, nonce, self._blockchain.difficulty) == False:
+    while self._crypto.valid_proof(data, nonce, difficulty) == False:
       nonce += 1
     return nonce
 
@@ -144,11 +152,19 @@ class BlockchainNode():
 app = flask.Flask(__name__)
 node = BlockchainNode()
 
+@app.route('/init', methods=['POST'])
+def init_node():
+  node.generate_auth()
+  return "Node initialised", 200
+
 @app.route('/mine', methods=['GET'])
 def mine():
-  node.mine_block()
+  block = node.mine_block()
+  if block is None:
+    return "Node error", 400
+
   response = {
-    'block' : node.last_block
+    'block' : block
   }
   return flask.jsonify(response), 200
 
@@ -163,13 +179,16 @@ def new_transaction():
 @app.route('/chain', methods=['GET'])
 def full_chain():
   response = {
-    'chain' : node.blockchain
+    'chain' : node.blockchain,
+    'length' : len(node.blockchain)
   }
   return flask.jsonify(response), 200
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
-  values = request.get_json()
+  values = flask.request.get_json()
+  if values is None:
+    return "Error: Please supply a valid list of nodes", 400
 
   nodes = values.get('nodes')
   if nodes is None:
@@ -181,7 +200,7 @@ def register_nodes():
   response = {
     'message': 'New nodes have been added'
   }
-  return jsonify(response), 201
+  return flask.jsonify(response), 201
 
 @app.route('/nodes/resolve', methods=['GET'])
 def consensus():
@@ -196,7 +215,7 @@ def consensus():
       'message': 'Our chain is authoritative'
     }
 
-  return jsonify(response), 200
+  return flask.jsonify(response), 200
 
 if __name__ == '__main__':
   from argparse import ArgumentParser

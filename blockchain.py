@@ -57,10 +57,6 @@ class Blockchain:
   def last_block(self):
     return self._chain[-1]
 
-  @property
-  def difficulty(self):
-    return 32
-
 if __name__ == '__main__':
   print("This module is a dependecy")
   exit(0)

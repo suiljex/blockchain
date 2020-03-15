@@ -39,7 +39,10 @@ class BlockchainClient():
     max_length = len(self._blockchain.export_chain())
 
     for node in neighbours:
-      response = requests.get(f'http://{node}/chain')
+      try:
+        response = requests.get(f'http://{node}/chain')
+      except requests.ConnectionError:
+        break
 
       if response.status_code == 200:
         length = response.json()['length']
@@ -80,9 +83,8 @@ class BlockchainClient():
         for tx_output in tx['data']['outputs']:
           if tx_output['recipient'] == self._address:
             self._balance += tx_output['amount']
-
-        self._availible_transactions[self._crypto.hash(tx['header'])] = tx
-
+            self._availible_transactions[self._crypto.hash(tx['header'])] = tx
+        
     for tx_id in used_transactions:
       self._availible_transactions.pop(tx_id, None)
     return self._balance
@@ -130,8 +132,8 @@ class BlockchainClient():
     }
 
     transaction = {
-      tx_header,
-      tx_data
+      'header' : tx_header,
+      'data' : tx_data
     }
 
     for node in self._nodes:
@@ -146,22 +148,25 @@ client = BlockchainClient()
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
   values = request.get_json()
-  if node.new_transaction(values['transaction']) == True:
-    return 201
-  else:
-    return "Wrong transaction", 400
+  # if node.new_transaction(values['transaction']) == True:
+  #   return 201
+  # else:
+  #   return "Wrong transaction", 400
+
+  return 201
 
 @app.route('/init', methods=['POST'])
 def init_client():
   client.generate_auth()
   return "Client initialised", 200
 
-@app.route('/chain', methods=['GET'])
-def full_chain():
-  response = {
-    'chain' : node.blockchain
-  }
-  return flask.jsonify(response), 200
+# @app.route('/chain', methods=['GET'])
+# def full_chain():
+#   response = {
+#     'chain' : node.blockchain,
+#     'length' : len(node.blockchain)
+#   }
+#   return flask.jsonify(response), 200
 
 @app.route('/balance', methods=['GET'])
 def calculate_balance():
@@ -172,7 +177,10 @@ def calculate_balance():
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
-  values = request.get_json()
+  values = flask.request.get_json()
+
+  if values is None:
+    return "Error: Please supply a valid list of nodes", 400
 
   nodes = values.get('nodes')
   if nodes is None:
@@ -184,7 +192,7 @@ def register_nodes():
   response = {
     'message': 'New nodes have been added'
   }
-  return jsonify(response), 201
+  return flask.jsonify(response), 201
 
 @app.route('/nodes/resolve', methods=['GET'])
 def consensus():
@@ -199,7 +207,7 @@ def consensus():
       'message': 'Our chain is authoritative'
     }
 
-  return jsonify(response), 200
+  return flask.jsonify(response), 200
 
 if __name__ == '__main__':
   from argparse import ArgumentParser

@@ -10,7 +10,7 @@ class BlockchainCrypto():
     guess = f'{last_hash}{nonce}'.encode()
     guess_hash = hashlib.sha256(guess).hexdigest()
     guess_hash_binary = str(bin(int(guess_hash, base=16)))[2:]
-    return guess_hash_binary[difficulty:] == "0" * difficulty
+    return guess_hash_binary[0:difficulty] == "0" * difficulty
 
   @staticmethod
   def hash(block):

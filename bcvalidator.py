@@ -69,13 +69,13 @@ class BlockchainValidator():
     if block['header']['data_hash'] != self._crypto.hash(block['data']):
       return False
 
-    if self._crypto.valid_proof(hash(service_data['previous_block']['header']), block['header']['nonce'], block['header']['difficulty']) == False:
+    if self._crypto.valid_proof(block['header']['data_hash'], block['header']['nonce'], block['header']['difficulty']) == False:
       return False
 
     for transaction in block['data']['transactions']:
       if self._valid_transaction(transaction, service_data) == False:
         return False
-      temp_txs_list[hash(transaction['header'])] = transaction
+      temp_txs_list[self._crypto.hash(transaction['header'])] = transaction
 
     service_data['txs_list'].update(temp_txs_list)
     return True
@@ -83,20 +83,20 @@ class BlockchainValidator():
   def _valid_transaction(self, transaction, service_data):
     if type(transaction) != type(dict()):
       return False
-    if transaction.keys().sort() != ['header', 'data'].sort():
+    if list(transaction.keys()).sort() != ['header', 'data'].sort():
       return False
-    if transaction['header'].keys().sort() != ['type', 'sender', 'public_key', 'signature'].sort():
+    if list(transaction['header'].keys()).sort() != ['type', 'sender', 'public_key', 'signature'].sort():
       return False
-    if transaction['header']['type'] == 2 and transaction['data'].keys().sort() != ['inputs', 'outputs'].sort():
+    if transaction['header']['type'] == 2 and list(transaction['data'].keys()).sort() != ['inputs', 'outputs'].sort():
       return False
-    if transaction['header']['type'] == 1 and transaction['data'].keys().sort() != ['outputs'].sort():
+    if transaction['header']['type'] == 1 and list(transaction['data'].keys()).sort() != ['outputs'].sort():
       return False
     for tx_output in transaction['data']['outputs']:
-      if tx_output.keys().sort() != ['reciever', 'amount'].sort():
+      if list(tx_output.keys()).sort() != ['reciever', 'amount'].sort():
         return False
     if transaction['header']['type'] == 2:
       for tx_input in transaction['data']['outputs']:
-        if tx_input.keys().sort() != ['tx_id'].sort():
+        if list(tx_input.keys()).sort() != ['tx_id'].sort():
           return False
         
     inputs_sum = 0
@@ -105,7 +105,7 @@ class BlockchainValidator():
     if transaction['header']['sender'] != self._crypto.generate_address(transaction['header']['public_key']):
         return False
 
-    if self._crypto.verify(json.dumps(transaction['data'], sort_keys=True).encode() 
+    if self._crypto.verify(self._crypto.hash(transaction['data'])
               , transaction['header']['signature']
               , transaction['header']['public_key']) == False:
       return False
