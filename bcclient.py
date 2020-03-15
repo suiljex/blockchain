@@ -1,6 +1,7 @@
 import json
 import flask
 import requests
+import re
 from urllib.parse import urlparse 
 from uuid import uuid4
 
@@ -21,7 +22,6 @@ class BlockchainClient():
     self._availible_transactions = dict()
     self._auth_ready = False
     self._bc_ready = False
-    # self._identifier = str(uuid4()).replace('-', '')
     
   def register_node(self, address):
     parsed_url = urlparse(address)
@@ -63,6 +63,17 @@ class BlockchainClient():
     self._public_key = self._crypto.generate_public_key(self._private_key)
     self._address = self._crypto.generate_address(self._public_key)
     self._auth_ready = True
+
+  def load_auth(self, private_key):
+    regex = re.compile('[a-f0-9]{64}')
+    match = regex.match(private_key)
+    if bool(match) == False:
+      return False
+    self._private_key = private_key
+    self._public_key = self._crypto.generate_public_key(self._private_key)
+    self._address = self._crypto.generate_address(self._public_key)
+    self._auth_ready = True
+    return True
 
   def calculate_balance(self):
     if not self._blockchain or not self._auth_ready:
@@ -168,10 +179,24 @@ def new_transaction():
 
   return 201
 
-@app.route('/init', methods=['POST'])
+@app.route('/auth/generate', methods=['POST'])
 def init_client():
   client.generate_auth()
-  return "Client initialised", 200
+  return "Auth generated", 200
+
+@app.route('/auth/load', methods=['POST'])
+def init_client():
+  values = flask.request.get_json()
+  if values is None:
+    return 400
+
+  if values['private_key'] is None:
+    return 400
+
+  if client.load_auth(values['private_key']) == False:
+    return 400
+
+  return "Auth loaded", 200
 
 # @app.route('/chain', methods=['GET'])
 # def full_chain():

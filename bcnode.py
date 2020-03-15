@@ -30,6 +30,17 @@ class BlockchainNode():
     self._address = self._crypto.generate_address(self._public_key)
     self._auth_ready = True
 
+  def load_auth(self, private_key):
+    regex = re.compile('[a-f0-9]{64}')
+    match = regex.match(private_key)
+    if bool(match) == False:
+      return False
+    self._private_key = private_key
+    self._public_key = self._crypto.generate_public_key(self._private_key)
+    self._address = self._crypto.generate_address(self._public_key)
+    self._auth_ready = True
+    return True
+
   @property
   def blockchain(self):
     return self._blockchain.export_chain()
@@ -152,10 +163,24 @@ class BlockchainNode():
 app = flask.Flask(__name__)
 node = BlockchainNode()
 
-@app.route('/init', methods=['POST'])
-def init_node():
+@app.route('/auth/generate', methods=['POST'])
+def init_client():
   node.generate_auth()
-  return "Node initialised", 200
+  return "Auth generated", 200
+
+@app.route('/auth/load', methods=['POST'])
+def init_client():
+  values = flask.request.get_json()
+  if values is None:
+    return 400
+
+  if values['private_key'] is None:
+    return 400
+
+  if node.load_auth(values['private_key']) == False:
+    return 400
+
+  return "Auth loaded", 200
 
 @app.route('/mine', methods=['GET'])
 def mine():
