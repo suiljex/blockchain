@@ -1,5 +1,6 @@
 import pickle
 
+
 class BlockchainFile():
     def __init__(self):
         self.filename = ""
@@ -10,7 +11,7 @@ class BlockchainFile():
             pickle.dump(blockchain, f)
             f.close()
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def load(self):
@@ -18,6 +19,7 @@ class BlockchainFile():
         with open(self.filename, "rb") as f:
             bc = pickle.load(f)
         return bc
+
 
 if __name__ == '__main__':
     print("This module is a dependecy")

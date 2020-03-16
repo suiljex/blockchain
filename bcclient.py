@@ -2,13 +2,13 @@ import json
 import flask
 import requests
 import re
-from urllib.parse import urlparse 
-from uuid import uuid4
+from urllib.parse import urlparse
 
 from blockchain import Blockchain
 from bccrypto import BlockchainCrypto
 from bcvalidator import BlockchainValidator
 from bcfile import BlockchainFile
+
 
 class BlockchainClient():
     def __init__(self):
@@ -32,11 +32,11 @@ class BlockchainClient():
             return False
 
         self._bcfile.filename = self._filename_chain
-        if self._bcfile.save(self._blockchain.export_chain()) == False:
+        if self._bcfile.save(self._blockchain.export_chain()) is False:
             self._bcfile.filename = ""
             return False
         self._bcfile.filename = self._filename_privk
-        if self._bcfile.save(self._private_key) == False:
+        if self._bcfile.save(self._private_key) is False:
             self._bcfile.filename = ""
             return False
         self._bcfile.filename = ""
@@ -51,17 +51,17 @@ class BlockchainClient():
 
         self._bcfile.filename = ""
 
-        if temp_privk == None or temp_chain == None:
+        if temp_privk is None or temp_chain is None:
             return False
 
-        if self.load_auth(temp_privk) == False:
+        if self.load_auth(temp_privk) is False:
             return False
 
-        if self._blockchain.import_chain(temp_chain) == False:
+        if self._blockchain.import_chain(temp_chain) is False:
             return False
-        
+
         return True
-        
+
     def register_node(self, address):
         parsed_url = urlparse(address)
         if parsed_url.netloc:
@@ -106,7 +106,7 @@ class BlockchainClient():
     def load_auth(self, private_key):
         regex = re.compile('[a-f0-9]{64}')
         match = regex.match(private_key)
-        if bool(match) == False:
+        if bool(match) is False:
             return False
         self._private_key = private_key
         self._public_key = self._crypto.generate_public_key(self._private_key)
@@ -134,7 +134,7 @@ class BlockchainClient():
                     if tx_output['recipient'] == self._address:
                         self._balance += tx_output['amount']
                         self._availible_transactions[self._crypto.hash(tx['header'])] = tx
-                
+
         for tx_id in used_transactions:
             self._availible_transactions.pop(tx_id, None)
         return self._balance
@@ -155,20 +155,20 @@ class BlockchainClient():
             for tx_output in self._availible_transactions[tx_id]['data']['outputs']:
                 if tx_output['recipient'] == self._address:
                     tx_balance += tx_output['amount']
-            tx_inputs.append({'tx_id' : tx_id})
+            tx_inputs.append({'tx_id': tx_id})
             if tx_balance >= amount:
                 break
 
         tx_data = {
-            'inputs' : tx_inputs,
-            'outputs' : [
+            'inputs': tx_inputs,
+            'outputs': [
                 {
-                    'recipient' : recipient,
-                    'amount' : amount
+                    'recipient': recipient,
+                    'amount': amount
                 },
                 {
-                    'recipient' : self._address,
-                    'amount' : tx_balance - amount
+                    'recipient': self._address,
+                    'amount': tx_balance - amount
                 }
             ]
         }
@@ -177,15 +177,15 @@ class BlockchainClient():
         signature = self._crypto.sign(tx_data_hash, self._private_key)
 
         tx_header = {
-            'type' : 2,
-            'sender' : self._address,
-            'public_key' : self._public_key,
-            'signature' : signature
+            'type': 2,
+            'sender': self._address,
+            'public_key': self._public_key,
+            'signature': signature
         }
 
         transaction = {
-            'header' : tx_header,
-            'data' : tx_data
+            'header': tx_header,
+            'data': tx_data
         }
 
         for node in self._nodes:
@@ -203,22 +203,26 @@ class BlockchainClient():
 app = flask.Flask(__name__)
 client = BlockchainClient()
 
+
 @app.route('/data/save', methods=['POST'])
 def save_data():
-    if client.save() == False:
+    if client.save() is False:
         return "Error", 400
     return "Data saved", 200
 
+
 @app.route('/data/load', methods=['POST'])
 def load_data():
-    if client.load() == False:
+    if client.load() is False:
         return "Error", 400
     return "Data loaded", 200
+
 
 @app.route('/auth/generate', methods=['POST'])
 def gen_auth():
     client.generate_auth()
     return "Auth generated", 200
+
 
 @app.route('/auth/load', methods=['POST'])
 def load_auth():
@@ -229,10 +233,11 @@ def load_auth():
     if values['private_key'] is None:
         return "Error", 400
 
-    if client.load_auth(values['private_key']) == False:
+    if client.load_auth(values['private_key']) is False:
         return "Error", 400
 
     return "Auth loaded", 200
+
 
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
@@ -251,20 +256,14 @@ def new_transaction():
 
     return "Success", 201
 
-# @app.route('/chain', methods=['GET'])
-# def full_chain():
-#   response = {
-#     'chain' : node.blockchain,
-#     'length' : len(node.blockchain)
-#   }
-#   return flask.jsonify(response), 200
 
 @app.route('/balance', methods=['GET'])
 def calculate_balance():
     response = {
-        'balance' : client.calculate_balance()
+        'balance': client.calculate_balance()
     }
     return flask.jsonify(response), 200
+
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
@@ -285,6 +284,7 @@ def register_nodes():
     }
     return flask.jsonify(response), 201
 
+
 @app.route('/nodes/resolve', methods=['POST'])
 def consensus():
     replaced = client.resolve_conflicts()
@@ -299,6 +299,7 @@ def consensus():
         }
 
     return flask.jsonify(response), 200
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

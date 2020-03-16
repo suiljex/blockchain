@@ -1,8 +1,8 @@
 import json
 import secrets
 import ecdsa
-import codecs
 import hashlib
+
 
 class BlockchainCrypto():
     @staticmethod
@@ -10,7 +10,7 @@ class BlockchainCrypto():
         guess = f'{last_hash}{nonce}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
         guess_hash_int = int(guess_hash, base=16)
-        return guess_hash_int < pow(2,256 - difficulty)
+        return guess_hash_int < pow(2, 256 - difficulty)
 
     @staticmethod
     def hash(block):
@@ -66,6 +66,7 @@ class BlockchainCrypto():
     @staticmethod
     def calculate_reward(difficulty):
         return 1
+
 
 if __name__ == '__main__':
     print("This module is a dependecy")
