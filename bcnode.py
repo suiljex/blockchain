@@ -70,6 +70,13 @@ class BlockchainNode():
         self._auth_ready = True
         return True
 
+    def export_auth(self):
+        return {
+            'private_key': self._private_key,
+            'public_key': self._public_key,
+            'address': self._address
+        }
+
     @property
     def blockchain(self):
         return self._blockchain.export_chain()
@@ -286,6 +293,15 @@ def load_auth():
     response['status'] = "SUCCESS"
     response['message'] = "Authentication data has been imported"
     return flask.jsonify(response), 202
+
+
+@app.route('/auth/export', methods=['GET'])
+def export_auth():
+    response = dict()
+    response['status'] = "SUCCESS"
+    response['message'] = "Auth data"
+    response['data'] = node.export_auth()
+    return flask.jsonify(response), 200
 
 
 @app.route('/block/mine', methods=['POST'])
