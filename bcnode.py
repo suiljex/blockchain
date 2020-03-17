@@ -122,7 +122,7 @@ class BlockchainNode():
         if not self._blockchain or not self._auth_ready:
             return None
 
-        if self._validator.valid_transaction(transaction, self._blockchain.export_chain()) is True:
+        if self._validator.valid_transaction_t(transaction, self._blockchain.export_blockchain_data()) is True:
             self._pending_transactions.append(transaction)
             return transaction
         return None

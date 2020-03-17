@@ -6,23 +6,47 @@ from bcvalidator import BlockchainValidator
 
 class Blockchain:
     def __init__(self):
-        self._blockchain = list()
+        self._chain = list()
+        self._blocks_map_id = dict()
+        self._transactions_map_id = dict()
+        self._used_transactions = dict()
         self._crypto = BlockchainCrypto()
         self._validator = BlockchainValidator()
         self._genesis_block()
 
     def export_chain(self):
-        return self._blockchain
+        return self._chain
+
+    def export_blockchain_data(self):
+        return {
+            'chain': self._chain,
+            'tx_map_id': self._transactions_map_id,
+            'blk_map_id': self._blocks_map_id,
+            'used_txs': self._used_transactions
+        }
 
     def import_chain(self, chain):
         if self._validator.valid_chain(chain) is True:
             self._chain = chain
+            self._rebuild_blockcahin_data()
             return True
 
         return False
 
+    def _rebuild_blockcahin_data(self):
+        self._blocks_map_id = dict()
+        self._transactions_map_id = dict()
+        self._used_transactions = dict()
+        for block in self._chain:
+            for tx in block['data']['transactions']:
+                if tx['header']['type'] == 2:
+                    for tx_input in tx['data']['inputs']:
+                        self._used_transactions[tx_input['tx_id']] = tx['header']['sender']
+                self._transactions_map_hash[self._crypto.hash(tx['header'])] = tx
+            self._blocks_map_id[self._crypto.hash(block['header'])] = block
+
     def _genesis_block(self):
-        self._blockchain = list()
+        self._chain = list()
 
         data = {
             'transactions': list()
@@ -42,19 +66,25 @@ class Blockchain:
             'data': data
         }
 
-        self._blockchain.append(block)
+        self._chain.append(block)
+        self._blocks_map_hash[self._crypto.hash(block['header'])] = block
         return block
 
-    def new_block(self, block):
-        if self._validator.valid_block(block, self._chain) is True:
-            # self.pending_transactions = []
-            self._blockchain.append(block)
+    def add_block(self, block):
+        if self._validator.valid_block(block, self.export_blockchain_data()) is True:
+            self._chain.append(block)
+            for tx in block['data']['transactions']:
+                if tx['header']['type'] == 2:
+                    for tx_input in tx['data']['inputs']:
+                        self._used_transactions[tx_input['tx_id']] = tx['header']['sender']
+                self._transactions_map_hash[self._crypto.hash(tx['header'])] = tx
+            self._blocks_map_hash[self._crypto.hash(block['header'])] = block
             return True
         return False
 
     @property
     def last_block(self):
-        return self._blockchain[-1]
+        return self._chain[-1]
 
 
 if __name__ == '__main__':
