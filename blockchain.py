@@ -66,7 +66,7 @@ class Blockchain:
         header = {
             'version': 1,
             'timestamp': time.time(),
-            'previous_block': "0" * 32,
+            'previous_block': "0" * 64,
             'nonce': 0,
             'difficulty': 0,
             'data_hash': self._crypto.hash(data)
