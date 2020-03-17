@@ -23,10 +23,10 @@ class Blockchain:
         return None
 
     def get_block_by_id(self, id):
-        return dict(self._blocks_map_id.get(id, None))
+        return self._blocks_map_id.get(id, None)
 
     def get_transaction_by_id(self, id):
-        return dict(self._transactions_map_id.get(id, None))
+        return self._transactions_map_id.get(id, None)
 
     def export_blockchain_data(self):
         return {
