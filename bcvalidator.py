@@ -45,20 +45,24 @@ class BlockchainValidator():
         blocks_map_id[self._crypto.hash(chain[0]['header'])] = chain[0]
 
         for block in chain[1:]:
-            if self.valid_block_fast(block, chain, local_blocks_map_id, local_transactions_map_id, local_used_transactions) is False:
+            if self._valid_block(block, chain, blocks_map_id, transactions_map_id, used_transactions) is False:
                 return False
             blocks_map_id[self._crypto.hash(block['header'])] = block
 
         return True
 
     def _valid_block(self, block, chain, blocks_map_id, transactions_map_id, used_transactions):
-        if block['header']['difficulty'] != self._crypto.calculate_difficulty(len(chain)):
-            return False
+        if block in chain:
+            if block['header']['difficulty'] != self._crypto.calculate_difficulty(chain.index(block)):
+                return False
+        else:
+            if block['header']['difficulty'] != self._crypto.calculate_difficulty(len(chain)):
+                return False
         if block['header']['data_hash'] != self._crypto.hash(block['data']):
             return False
         if self._crypto.valid_proof(block['header']['data_hash'], block['header']['nonce'], block['header']['difficulty']) is False:
             return False
-        if block['header']['previous_block'] != self._crypto.hash(blocks_map_id['previous_block']['header']):
+        if block['header']['previous_block'] != self._crypto.hash(blocks_map_id[block['header']['previous_block']]['header']):
             return False
     
         for transaction in block['data']['transactions']:
@@ -117,7 +121,7 @@ class BlockchainValidator():
                         inputs_sum += tx_out['amount']
                         
                 # Проверка на то, что транзакции уже не использованы
-                if transaction['header']['sender'] in used_transactions[input_tx['tx_id']]:
+                if transaction['header']['sender'] in used_transactions.get(input_tx['tx_id'], []):
                     return False
                 used_transactions[input_tx['tx_id']] = transaction['header']['sender']
                 

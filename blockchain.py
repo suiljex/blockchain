@@ -15,14 +15,14 @@ class Blockchain:
         self._genesis_block()
 
     def export_chain(self):
-        return self._chain
+        return list(self._chain)
 
     def export_blockchain_data(self):
         return {
-            'chain': self._chain,
-            'tx_map_id': self._transactions_map_id,
-            'blk_map_id': self._blocks_map_id,
-            'used_txs': self._used_transactions
+            'chain': list(self._chain),
+            'tx_map_id': dict(self._transactions_map_id),
+            'blk_map_id': dict(self._blocks_map_id),
+            'used_txs': dict(self._used_transactions)
         }
 
     def import_chain(self, chain):
@@ -42,7 +42,7 @@ class Blockchain:
                 if tx['header']['type'] == 2:
                     for tx_input in tx['data']['inputs']:
                         self._used_transactions[tx_input['tx_id']] = tx['header']['sender']
-                self._transactions_map_hash[self._crypto.hash(tx['header'])] = tx
+                self._transactions_map_id[self._crypto.hash(tx['header'])] = tx
             self._blocks_map_id[self._crypto.hash(block['header'])] = block
 
     def _genesis_block(self):
@@ -67,18 +67,18 @@ class Blockchain:
         }
 
         self._chain.append(block)
-        self._blocks_map_hash[self._crypto.hash(block['header'])] = block
+        self._blocks_map_id[self._crypto.hash(block['header'])] = block
         return block
 
     def add_block(self, block):
-        if self._validator.valid_block(block, self.export_blockchain_data()) is True:
+        if self._validator.valid_block_t(block, self.export_blockchain_data()) is True:
             self._chain.append(block)
             for tx in block['data']['transactions']:
                 if tx['header']['type'] == 2:
                     for tx_input in tx['data']['inputs']:
                         self._used_transactions[tx_input['tx_id']] = tx['header']['sender']
-                self._transactions_map_hash[self._crypto.hash(tx['header'])] = tx
-            self._blocks_map_hash[self._crypto.hash(block['header'])] = block
+                self._transactions_map_id[self._crypto.hash(tx['header'])] = tx
+            self._blocks_map_id[self._crypto.hash(block['header'])] = block
             return True
         return False
 

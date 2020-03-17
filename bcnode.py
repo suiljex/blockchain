@@ -18,9 +18,10 @@ class BlockchainNode():
         self._blockchain = Blockchain()
         self._validator = BlockchainValidator()
         self._crypto = BlockchainCrypto()
-        self._bcfile = BlockchainFile()
-        self._filename_chain = "node_blockchain.bin"
-        self._filename_privk = "node_private_key.bin"
+        self._bcfile_chain = BlockchainFile()
+        self._bcfile_privk = BlockchainFile()
+        self._bcfile_chain.filename = "node_blockchain.bin"
+        self._bcfile_privk.filename = "node_private_key.bin"
         self._private_key = str()
         self._public_key = str()
         self._address = str()
@@ -31,25 +32,15 @@ class BlockchainNode():
         if not self._blockchain or not self._auth_ready:
             return False
 
-        self._bcfile.filename = self._filename_chain
-        if self._bcfile.save(self._blockchain.export_chain()) is False:
-            self._bcfile.filename = ""
+        if self._bcfile_chain.save(self._blockchain.export_chain()) is False:
             return False
-        self._bcfile.filename = self._filename_privk
-        if self._bcfile.save(self._private_key) is False:
-            self._bcfile.filename = ""
+        if self._bcfile_privk.save(self._private_key) is False:
             return False
-        self._bcfile.filename = ""
         return True
 
     def load(self):
-        self._bcfile.filename = self._filename_privk
-        temp_privk = self._bcfile.load()
-
-        self._bcfile.filename = self._filename_chain
-        temp_chain = self._bcfile.load()
-
-        self._bcfile.filename = ""
+        temp_privk = self._bcfile_privk.load()
+        temp_chain = self._bcfile_chain.load()
 
         if temp_privk is None or temp_chain is None:
             return False
@@ -113,9 +104,14 @@ class BlockchainNode():
                     new_chain = chain
 
         if new_chain:
+            temp_pending_txs = list()
+            for block in self._blockchain.export_chain():
+                for tx in block['data']['transactions']:
+                    temp_pending_txs.append(tx)
             self._blockchain.import_chain(new_chain)
+            self._pending_transactions += temp_pending_txs
+            self._pending_transactions = self._select_transactions(0)
             return True
-
         return False
 
     def new_transaction(self, transaction):
@@ -157,12 +153,11 @@ class BlockchainNode():
             'header': tx_header,
             'data': tx_data
         }
-
+        
+        selected_txs = self._select_transactions(42)
         block_data = {
-            'transactions': [tx_reward] + self._pending_transactions
+            'transactions': [tx_reward] + selected_txs
         }
-
-        self._pending_transactions = list()
 
         block_header = {
             'version': 1,
@@ -180,9 +175,38 @@ class BlockchainNode():
             'data': block_data
         }
 
-        if self._blockchain.new_block(block) is False:
+        if self._blockchain.add_block(block) is False:
+            self._pending_transactions = self._select_transactions(0)
             return None
+
+        self._pending_transactions = [elem for elem in self._pending_transactions if elem not in selected_txs]
+        self._pending_transactions = self._select_transactions(0)
         return block
+
+    def _select_transactions(self, amount=0):
+        selected_txs = list()
+        blockchain_data = self._blockchain.export_blockchain_data()
+        local_used_transactions = blockchain_data['used_txs']
+        local_transactions_map_id = blockchain_data['tx_map_id']
+        local_blocks_map_id = blockchain_data['blk_map_id']
+
+        flag_all = False
+        if amount == 0:
+            flag_all = True
+
+        selected = 0
+        for tx in self._pending_transactions:
+            if selected >= amount and flag_all == False:
+                break
+            if self._validator.valid_transaction_t(tx, blockchain_data) is True:
+                if tx['header']['type'] == 2:
+                    for tx_input in tx['data']['inputs']:
+                        local_used_transactions[tx_input['tx_id']] = tx['header']['sender']
+                local_transactions_map_id[self._crypto.hash(tx['header'])] = tx
+                selected_txs.append(tx)
+                selected += 1
+        
+        return selected_txs
 
     def _proof_of_work(self, data, difficulty):
         # last_block_hash = hash(self._blockchain.last_block['header'])

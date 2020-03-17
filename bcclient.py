@@ -94,7 +94,6 @@ class BlockchainClient():
         if new_chain:
             self._blockchain.import_chain(new_chain)
             return True
-
         return False
 
     def generate_auth(self):
