@@ -64,7 +64,7 @@ class BlockchainValidator():
             return False
         if block['header']['previous_block'] != self._crypto.hash(blocks_map_id[block['header']['previous_block']]['header']):
             return False
-    
+
         for transaction in block['data']['transactions']:
             if self._valid_transaction(transaction, chain, blocks_map_id, transactions_map_id, used_transactions) is False:
                 return False
@@ -119,12 +119,12 @@ class BlockchainValidator():
                 for tx_out in transactions_map_id[input_tx['tx_id']]['data']['outputs']:
                     if transaction['header']['sender'] == tx_out['recipient']:
                         inputs_sum += tx_out['amount']
-                        
+
                 # Проверка на то, что транзакции уже не использованы
                 if transaction['header']['sender'] in used_transactions.get(input_tx['tx_id'], []):
                     return False
                 used_transactions[input_tx['tx_id']] = transaction['header']['sender']
-                
+
             for output_tx in transaction['data']['outputs']:
                 if output_tx['amount'] < 0:
                     return False

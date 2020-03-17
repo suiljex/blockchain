@@ -84,8 +84,8 @@ class BlockchainClient():
                 break
 
             if response.status_code == 200:
-                length = response.json()['length']
-                chain = response.json()['chain']
+                length = response.json()['data']['length']
+                chain = response.json()['data']['chain']
 
                 if length > max_length and self._validator.valid_chain(chain):
                     max_length = length
@@ -205,60 +205,84 @@ client = BlockchainClient()
 
 @app.route('/data/save', methods=['POST'])
 def save_data():
+    response = dict()
     if client.save() is False:
-        return "Error", 400
-    return "Data saved", 200
+        response['status'] = "ERROR"
+        response['message'] = "Error occured while saving data to file"
+        return flask.jsonify(response), 500
+    response['status'] = "SUCCESS"
+    response['message'] = "Data successfuly has been saved to file"
+    return flask.jsonify(response), 200
 
 
 @app.route('/data/load', methods=['POST'])
 def load_data():
+    response = dict()
     if client.load() is False:
-        return "Error", 400
-    return "Data loaded", 200
+        response['status'] = "ERROR"
+        response['message'] = "Error occured while loading data from file"
+        return flask.jsonify(response), 500
+    response['status'] = "SUCCESS"
+    response['message'] = "Data successfuly has been loaded from file"
+    return flask.jsonify(response), 200
 
 
 @app.route('/auth/generate', methods=['POST'])
 def gen_auth():
     client.generate_auth()
-    return "Auth generated", 200
+    response = dict()
+    response['status'] = "SUCCESS"
+    response['message'] = "Authentication data has been generated"
+    return flask.jsonify(response), 200
 
 
-@app.route('/auth/load', methods=['POST'])
+@app.route('/auth/import', methods=['POST'])
 def load_auth():
+    response = dict()
     values = flask.request.get_json()
-    if values is None:
-        return "Error", 400
-
-    if values['private_key'] is None:
-        return "Error", 400
+    if values is None or values['private_key'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "No data was recieved"
+        return flask.jsonify(response), 400
 
     if client.load_auth(values['private_key']) is False:
-        return "Error", 400
+        response['status'] = "ERROR"
+        response['message'] = "No private key was detected"
+        return flask.jsonify(response), 400
 
-    return "Auth loaded", 200
+    response['status'] = "SUCCESS"
+    response['message'] = "Authentication data has been imported"
+    return flask.jsonify(response), 202
 
 
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
+    response = dict()
     values = flask.request.get_json()
-    if values is None:
-        return "Error", 400
-
-    if values['amount'] is None or values['recipient'] is None:
-        return "Error", 400
+    if values is None or values['amount'] is None or values['recipient'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "No data was recieved"
+        return flask.jsonify(response), 400
 
     amount = values['amount']
     recipient = values['recipient']
 
     if client.make_transaction(recipient, amount) is False:
-        return "Error", 400
+        response['status'] = "ERROR"
+        response['message'] = "Transaction was rejected"
+        return flask.jsonify(response), 400
 
-    return "Success", 201
+    response['status'] = "SUCCESS"
+    response['message'] = "Transaction will be added to the next block"
+    return flask.jsonify(response), 201
 
 
 @app.route('/balance', methods=['GET'])
 def calculate_balance():
-    response = {
+    response = dict()
+    response['status'] = "SUCCESS"
+    response['message'] = "Balance"
+    response['data'] = {
         'balance': client.calculate_balance()
     }
     return flask.jsonify(response), 200
@@ -266,36 +290,31 @@ def calculate_balance():
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
+    response = dict()
     values = flask.request.get_json()
+    if values is None or values['nodes'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "Please supply a valid list of nodes"
+        return flask.jsonify(response), 400
 
-    if values is None:
-        return "Error: Please supply a valid list of nodes", 400
-
-    nodes = values.get('nodes')
-    if nodes is None:
-        return "Error: Please supply a valid list of nodes", 400
-
+    nodes = values['nodes']
     for other_node in nodes:
         client.register_node(other_node)
 
-    response = {
-        'message': 'New nodes have been added'
-    }
+    response['status'] = "SUCCESS"
+    response['message'] = "New nodes have been added"
     return flask.jsonify(response), 201
 
 
 @app.route('/nodes/resolve', methods=['POST'])
 def consensus():
+    response = dict()
     replaced = client.resolve_conflicts()
-
+    response['status'] = "SUCCESS"
     if replaced:
-        response = {
-            'message': 'Our chain was replaced'
-        }
+        response['message'] = "Our chain have been replaced"
     else:
-        response = {
-            'message': 'Our chain is authoritative'
-        }
+        response['message'] = "Our chain is authoritative"
 
     return flask.jsonify(response), 200
 

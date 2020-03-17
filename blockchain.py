@@ -17,6 +17,17 @@ class Blockchain:
     def export_chain(self):
         return list(self._chain)
 
+    def get_block_by_index(self, index):
+        if index >= 0 and index < len(self._chain):
+            return dict(self._chain[index])
+        return None
+
+    def get_block_by_id(self, id):
+        return dict(self._blocks_map_id.get(id, None))
+
+    def get_transaction_by_id(self, id):
+        return dict(self._transactions_map_id.get(id, None))
+
     def export_blockchain_data(self):
         return {
             'chain': list(self._chain),

@@ -74,6 +74,15 @@ class BlockchainNode():
     def blockchain(self):
         return self._blockchain.export_chain()
 
+    def get_block_by_index(self, index):
+        return self._blockchain.get_block_by_index(index)
+
+    def get_block_by_id(self, id):
+        return self._blockchain.get_block_by_id(id)
+
+    def get_transaction_by_id(self, id):
+        return self._blockchain.get_transaction_by_id(id)
+
     def register_node(self, address):
         parsed_url = urlparse(address)
         if parsed_url.netloc:
@@ -96,8 +105,8 @@ class BlockchainNode():
                 break
 
             if response.status_code == 200:
-                length = response.json()['length']
-                chain = response.json()['chain']
+                length = response.json()['data']['length']
+                chain = response.json()['data']['chain']
 
                 if length > max_length and self._validator.valid_chain(chain):
                     max_length = length
@@ -153,7 +162,7 @@ class BlockchainNode():
             'header': tx_header,
             'data': tx_data
         }
-        
+
         selected_txs = self._select_transactions(42)
         block_data = {
             'transactions': [tx_reward] + selected_txs
@@ -188,7 +197,7 @@ class BlockchainNode():
         blockchain_data = self._blockchain.export_blockchain_data()
         local_used_transactions = blockchain_data['used_txs']
         local_transactions_map_id = blockchain_data['tx_map_id']
-        local_blocks_map_id = blockchain_data['blk_map_id']
+        # local_blocks_map_id = blockchain_data['blk_map_id']
 
         flag_all = False
         if amount == 0:
@@ -205,11 +214,10 @@ class BlockchainNode():
                 local_transactions_map_id[self._crypto.hash(tx['header'])] = tx
                 selected_txs.append(tx)
                 selected += 1
-        
+
         return selected_txs
 
     def _proof_of_work(self, data, difficulty):
-        # last_block_hash = hash(self._blockchain.last_block['header'])
         nonce = 0
         while self._crypto.valid_proof(data, nonce, difficulty) is False:
             nonce += 1
@@ -230,46 +238,115 @@ node = BlockchainNode()
 
 @app.route('/data/save', methods=['POST'])
 def save_data():
+    response = dict()
     if node.save() is False:
-        return "Error", 400
-    return "Data saved", 200
+        response['status'] = "ERROR"
+        response['message'] = "Error occured while saving data to file"
+        return flask.jsonify(response), 500
+    response['status'] = "SUCCESS"
+    response['message'] = "Data successfuly has been saved to file"
+    return flask.jsonify(response), 200
 
 
 @app.route('/data/load', methods=['POST'])
 def load_data():
+    response = dict()
     if node.load() is False:
-        return "Error", 400
-    return "Data loaded", 200
+        response['status'] = "ERROR"
+        response['message'] = "Error occured while loading data from file"
+        return flask.jsonify(response), 500
+    response['status'] = "SUCCESS"
+    response['message'] = "Data successfuly has been loaded from file"
+    return flask.jsonify(response), 200
 
 
 @app.route('/auth/generate', methods=['POST'])
 def gen_auth():
     node.generate_auth()
-    return "Auth generated", 200
+    response = dict()
+    response['status'] = "SUCCESS"
+    response['message'] = "Authentication data has been generated"
+    return flask.jsonify(response), 200
 
 
-@app.route('/auth/load', methods=['POST'])
+@app.route('/auth/import', methods=['POST'])
 def load_auth():
+    response = dict()
     values = flask.request.get_json()
-    if values is None:
-        return "Error", 400
-
-    if values['private_key'] is None:
-        return "Error", 400
+    if values is None or values['private_key'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "No data was recieved"
+        return flask.jsonify(response), 400
 
     if node.load_auth(values['private_key']) is False:
-        return "Error", 400
+        response['status'] = "ERROR"
+        response['message'] = "No private key was detected"
+        return flask.jsonify(response), 400
 
-    return "Auth loaded", 200
+    response['status'] = "SUCCESS"
+    response['message'] = "Authentication data has been imported"
+    return flask.jsonify(response), 202
 
 
-@app.route('/mine', methods=['POST'])
+@app.route('/block/mine', methods=['POST'])
 def mine():
+    response = dict()
     block = node.mine_block()
     if block is None:
-        return "Node error", 400
+        response['status'] = "ERROR"
+        response['message'] = "Error occured while mining block"
+        return flask.jsonify(response), 500
+    response['status'] = "SUCCESS"
+    response['message'] = "Block has been successfuly mined and saved to blockchain"
+    response['data'] = {
+        'block': block
+    }
+    return flask.jsonify(response), 200
 
-    response = {
+
+@app.route('/block/get/index', methods=['GET'])
+def get_block_index():
+    response = dict()
+    values = flask.request.get_json()
+    if values is None or values['index'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "No data was recieved"
+        return flask.jsonify(response), 400
+
+    blk_index = int(values['index'])
+    block = node.get_block_by_index(blk_index)
+    if block is None:
+        response['status'] = "ERROR"
+        response['message'] = "Block is not found"
+        return flask.jsonify(response), 500
+
+    response['status'] = "SUCCESS"
+    response['message'] = "Block"
+    response['data'] = {
+        'block': block
+    }
+    return flask.jsonify(response), 200
+
+
+@app.route('/block/get/id', methods=['GET'])
+def get_block_id():
+    response = dict()
+    values = flask.request.get_json()
+    if values is None or values['id'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "No data was recieved"
+        return flask.jsonify(response), 400
+
+    blk_id = str(values['id'])
+    block = node.get_block_by_id(blk_id)
+    if block is None:
+        response['status'] = "ERROR"
+        response['message'] = "Block is not found"
+        return flask.jsonify(response), 500
+
+    response['status'] = "SUCCESS"
+    response['message'] = "Block"
+    response['data'] = {
         'block': block
     }
     return flask.jsonify(response), 200
@@ -277,25 +354,56 @@ def mine():
 
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
+    response = dict()
     values = flask.request.get_json()
-    if values is None:
-        return "Error", 400
-
-    if values['transaction'] is None:
-        return False
+    if values is None or values['transaction'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "No data was recieved"
+        return flask.jsonify(response), 400
 
     tx_json = values['transaction']
     transaction = json.loads(tx_json)
 
     if node.new_transaction(transaction) is None:
-        return "Wrong transaction", 400
-    else:
-        return "Success", 201
+        response['status'] = "ERROR"
+        response['message'] = "Transaction was rejected"
+        return flask.jsonify(response), 400
+
+    response['status'] = "SUCCESS"
+    response['message'] = "Transaction will be added to the next block"
+    return flask.jsonify(response), 201
+
+
+@app.route('/transaction/get/id', methods=['GET'])
+def get_transaction_id():
+    response = dict()
+    values = flask.request.get_json()
+    if values is None or values['id'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "No data was recieved"
+        return flask.jsonify(response), 400
+
+    blk_id = str(values['id'])
+    transaction = node.get_transaction_by_id(blk_id)
+    if transaction is None:
+        response['status'] = "ERROR"
+        response['message'] = "Transaction is not found"
+        return flask.jsonify(response), 500
+
+    response['status'] = "SUCCESS"
+    response['message'] = "Transaction"
+    response['data'] = {
+        'transaction': transaction
+    }
+    return flask.jsonify(response), 200
 
 
 @app.route('/chain', methods=['GET'])
 def full_chain():
-    response = {
+    response = dict()
+    response['status'] = "SUCCESS"
+    response['message'] = "Chain"
+    response['data'] = {
         'chain': node.blockchain,
         'length': len(node.blockchain)
     }
@@ -304,35 +412,31 @@ def full_chain():
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
+    response = dict()
     values = flask.request.get_json()
-    if values is None:
-        return "Error: Please supply a valid list of nodes", 400
+    if values is None or values['nodes'] is None:
+        response['status'] = "ERROR"
+        response['message'] = "Please supply a valid list of nodes"
+        return flask.jsonify(response), 400
 
-    nodes = values.get('nodes')
-    if nodes is None:
-        return "Error: Please supply a valid list of nodes", 400
-
+    nodes = values['nodes']
     for other_node in nodes:
         node.register_node(other_node)
 
-    response = {
-        'message': 'New nodes have been added'
-    }
+    response['status'] = "SUCCESS"
+    response['message'] = "New nodes have been added"
     return flask.jsonify(response), 201
 
 
 @app.route('/nodes/resolve', methods=['POST'])
 def consensus():
+    response = dict()
     replaced = node.resolve_conflicts()
-
+    response['status'] = "SUCCESS"
     if replaced:
-        response = {
-            'message': 'Our chain was replaced'
-        }
+        response['message'] = "Our chain have been replaced"
     else:
-        response = {
-            'message': 'Our chain is authoritative'
-        }
+        response['message'] = "Our chain is authoritative"
 
     return flask.jsonify(response), 200
 
